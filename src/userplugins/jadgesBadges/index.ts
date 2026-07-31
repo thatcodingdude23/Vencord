@@ -6,7 +6,7 @@
 import { addProfileBadge, BadgePosition, type BadgeUserArgs, type ProfileBadge, removeProfileBadge } from "@api/Badges";
 import { Settings } from "@api/Settings";
 import definePlugin, { OptionType } from "@utils/types";
-import { React } from "@webpack/common";
+import { React, Tooltip } from "@webpack/common";
 
 interface JadgesBadge {
     name?: string;
@@ -69,7 +69,7 @@ async function prepareBadgeData(data: JadgesResponse): Promise<JadgesResponse> {
                     localImage: await fetchLocalImage(badge.badge)
                 };
             } catch (error) {
-                console.error(`[JadgesBadges v5] Failed to prepare ${badge.badge}:`, error);
+                console.error(`[JadgesBadges v6] Failed to prepare ${badge.badge}:`, error);
                 return badge;
             }
         }));
@@ -98,24 +98,33 @@ async function refreshBadges(): Promise<void> {
 
         badgeData = await prepareBadgeData(data as JadgesResponse);
         const count = Object.values(badgeData).reduce((total, badges) => total + badges.length, 0);
-        console.warn(`[JadgesBadges v5] Loaded ${count} badge(s) with custom image components.`);
+        console.warn(`[JadgesBadges v6] Loaded ${count} badge(s) with hover tooltips.`);
     } catch (error) {
-        console.error("[JadgesBadges v5] Failed to refresh badges:", error);
+        console.error("[JadgesBadges v6] Failed to refresh badges:", error);
     }
 }
 
 function JadgesBadgeIcon({ image, description }: ProfileBadge & BadgeUserArgs) {
-    return React.createElement("img", {
-        src: image,
-        alt: description || "Jadges Badge",
-        draggable: false,
-        style: {
-            width: "20px",
-            height: "20px",
-            display: "block",
-            objectFit: "contain"
-        }
-    });
+    const label = description || "Jadges Badge";
+
+    return React.createElement(
+        Tooltip,
+        { text: label },
+        (tooltipProps: Record<string, unknown>) => React.createElement("img", {
+            ...tooltipProps,
+            src: image,
+            alt: label,
+            "aria-label": label,
+            draggable: false,
+            style: {
+                width: "20px",
+                height: "20px",
+                display: "block",
+                objectFit: "contain",
+                cursor: "default"
+            }
+        })
+    );
 }
 
 function getBadges({ userId }: BadgeUserArgs): ProfileBadge[] {
@@ -159,7 +168,7 @@ export default definePlugin({
     },
 
     async start() {
-        console.warn("[JadgesBadges v5] Starting custom-component build.");
+        console.warn("[JadgesBadges v6] Starting tooltip-enabled custom-component build.");
         addProfileBadge(profileBadge);
         await refreshBadges();
 
