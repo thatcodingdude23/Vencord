@@ -32,6 +32,8 @@ export interface ProfileBadge {
     component?: ComponentType<ProfileBadge & BadgeUserArgs>;
     /** The custom image to use */
     image?: string;
+    /** Render the custom image with a plain img while keeping Discord's native badge wrapper and hover */
+    rawImage?: boolean;
     link?: string;
     /** Action to perform when you click the badge */
     onClick?(event: React.MouseEvent<HTMLButtonElement, MouseEvent>, props: BadgeUserArgs): void;
@@ -62,7 +64,7 @@ export function addProfileBadge(badge: ProfileBadge) {
 }
 
 /**
- * Unregister a badge from the Badges API
+ * Unregister a badge with the Badges API
  * @param badge The badge to remove
  */
 export function removeProfileBadge(badge: ProfileBadge) {
