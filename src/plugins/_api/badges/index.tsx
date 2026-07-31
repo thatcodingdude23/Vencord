@@ -185,7 +185,7 @@ export default definePlugin({
                                         }}
                                     >
                                         <Heart />
-                                        Vencord Contributor
+                                        Vencord Donor
                                     </Forms.FormTitle>
                                 </Flex>
                             </ModalHeader>
