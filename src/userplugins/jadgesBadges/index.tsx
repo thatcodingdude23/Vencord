@@ -13,6 +13,7 @@ interface JadgesBadge {
     name?: string;
     tooltip?: string;
     badge: string;
+    embeddedImage?: string;
 }
 
 type JadgesResponse = Record<string, JadgesBadge[]>;
@@ -24,6 +25,7 @@ const CSP_DIRECTIVES = ["connect-src", "img-src"];
 let badgeData: JadgesResponse = {};
 let refreshTimer: ReturnType<typeof setInterval> | undefined;
 let restartModalShown = false;
+const imageCache = new Map<string, string>();
 
 function normalizeApiUrl(value: unknown): string {
     const url = typeof value === "string" ? value.trim() : "";
@@ -61,12 +63,74 @@ async function isHostReady(apiUrl: string): Promise<boolean> {
     }
 }
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            if (typeof reader.result === "string") resolve(reader.result);
+            else reject(new TypeError("Could not convert badge image to a data URL"));
+        };
+        reader.onerror = () => reject(reader.error ?? new Error("Could not read badge image"));
+        reader.readAsDataURL(blob);
+    });
+}
+
+async function fetchEmbeddedImage(url: string, noCache: boolean): Promise<string> {
+    const cached = imageCache.get(url);
+    if (cached) return cached;
+
+    const response = await fetch(url, {
+        cache: noCache ? "no-store" : "force-cache",
+        credentials: "omit"
+    });
+
+    if (!response.ok) {
+        throw new Error(`Badge image returned HTTP ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    if (!blob.type.startsWith("image/")) {
+        throw new TypeError(`Badge URL returned ${blob.type || "an unknown content type"}`);
+    }
+
+    const dataUrl = await blobToDataUrl(blob);
+    imageCache.set(url, dataUrl);
+    return dataUrl;
+}
+
+async function embedBadgeImages(data: JadgesResponse, noCache: boolean): Promise<JadgesResponse> {
+    const output: JadgesResponse = {};
+
+    await Promise.all(Object.entries(data).map(async ([userId, badges]) => {
+        if (!Array.isArray(badges)) return;
+
+        output[userId] = await Promise.all(badges.map(async badge => {
+            if (!badge || typeof badge.badge !== "string" || !badge.badge.startsWith("https://")) {
+                return badge;
+            }
+
+            try {
+                return {
+                    ...badge,
+                    embeddedImage: await fetchEmbeddedImage(badge.badge, noCache)
+                };
+            } catch (error) {
+                console.error(`[JadgesBadges] Failed to prepare image ${badge.badge}:`, error);
+                return badge;
+            }
+        }));
+    }));
+
+    return output;
+}
+
 async function refreshBadges(noCache = false): Promise<void> {
     const apiUrl = normalizeApiUrl(Settings.plugins.JadgesBadges?.apiUrl);
 
     try {
         const response = await fetch(apiUrl, {
-            cache: noCache ? "no-store" : "default"
+            cache: noCache ? "no-store" : "default",
+            credentials: "omit"
         });
 
         if (!response.ok) {
@@ -78,7 +142,7 @@ async function refreshBadges(noCache = false): Promise<void> {
             throw new TypeError("Jadges API returned an invalid response");
         }
 
-        badgeData = data as JadgesResponse;
+        badgeData = await embedBadgeImages(data as JadgesResponse, noCache);
     } catch (error) {
         console.error("[JadgesBadges] Failed to refresh badges:", error);
     }
@@ -98,7 +162,7 @@ function getBadges({ userId }: BadgeUserArgs): ProfileBadge[] {
                 id,
                 key: id,
                 description,
-                image: badge.badge,
+                image: badge.embeddedImage || badge.badge,
                 position: BadgePosition.END,
                 props: {
                     alt: description,
@@ -143,7 +207,7 @@ export default definePlugin({
         await refreshBadges(true);
 
         clearInterval(refreshTimer);
-        refreshTimer = setInterval(() => void refreshBadges(true), REFRESH_INTERVAL);
+        refreshTimer = setInterval(() => void refreshBadges(false), REFRESH_INTERVAL);
     },
 
     stop() {
@@ -151,6 +215,7 @@ export default definePlugin({
         clearInterval(refreshTimer);
         refreshTimer = undefined;
         badgeData = {};
+        imageCache.clear();
         restartModalShown = false;
     }
 });
