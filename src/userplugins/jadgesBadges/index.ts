@@ -17,6 +17,7 @@ type JadgesResponse = Record<string, JadgesBadge[]>;
 
 const DEFAULT_API_URL = "https://jadges.onrender.com/badges.json";
 const REFRESH_INTERVAL = 60_000;
+const CSP_DIRECTIVES = ["connect-src", "img-src"];
 
 let badgeData: JadgesResponse = {};
 let refreshTimer: ReturnType<typeof setInterval> | undefined;
@@ -24,6 +25,42 @@ let refreshTimer: ReturnType<typeof setInterval> | undefined;
 function normalizeApiUrl(value: unknown): string {
     const url = typeof value === "string" ? value.trim() : "";
     return url || DEFAULT_API_URL;
+}
+
+async function ensureHostPermission(apiUrl: string): Promise<boolean> {
+    if (IS_WEB) return true;
+
+    let origin: string;
+    try {
+        origin = new URL(apiUrl).origin;
+    } catch {
+        console.error("[JadgesBadges] Invalid API URL:", apiUrl);
+        return false;
+    }
+
+    const allowed = await VencordNative.csp.isDomainAllowed(origin, CSP_DIRECTIVES);
+    if (allowed) return true;
+
+    const result = await VencordNative.csp.requestAddOverride(
+        origin,
+        CSP_DIRECTIVES,
+        "JadgesBadges"
+    );
+
+    if (result === "ok") {
+        console.warn("[JadgesBadges] Host permission granted. Fully close and restart Discord to apply it.");
+        return false;
+    }
+
+    if (result === "conflict") {
+        console.error(
+            "[JadgesBadges] A CSP rule already exists for this domain but does not include both connect-src and img-src. Remove the existing rule in Vencord settings, then restart Discord and enable JadgesBadges again."
+        );
+        return false;
+    }
+
+    console.error(`[JadgesBadges] Host permission was not granted (${result}).`);
+    return false;
 }
 
 async function refreshBadges(noCache = false): Promise<void> {
@@ -45,7 +82,7 @@ async function refreshBadges(noCache = false): Promise<void> {
 
         badgeData = data as JadgesResponse;
     } catch (error) {
-        console.error("[JadgesBadges] Failed to fetch badges:", error);
+        console.error("[JadgesBadges] Failed to refresh badges:", error);
     }
 }
 
@@ -96,6 +133,10 @@ export default definePlugin({
 
     async start() {
         addProfileBadge(profileBadge);
+
+        const apiUrl = normalizeApiUrl(Settings.plugins.JadgesBadges?.apiUrl);
+        if (!(await ensureHostPermission(apiUrl))) return;
+
         await refreshBadges(true);
 
         clearInterval(refreshTimer);
