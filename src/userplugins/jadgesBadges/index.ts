@@ -6,6 +6,7 @@
 import { addProfileBadge, BadgePosition, type BadgeUserArgs, type ProfileBadge, removeProfileBadge } from "@api/Badges";
 import { Settings } from "@api/Settings";
 import definePlugin, { OptionType } from "@utils/types";
+import { React } from "@webpack/common";
 
 interface JadgesBadge {
     name?: string;
@@ -68,7 +69,7 @@ async function prepareBadgeData(data: JadgesResponse): Promise<JadgesResponse> {
                     localImage: await fetchLocalImage(badge.badge)
                 };
             } catch (error) {
-                console.error(`[JadgesBadges v4] Failed to prepare ${badge.badge}:`, error);
+                console.error(`[JadgesBadges v5] Failed to prepare ${badge.badge}:`, error);
                 return badge;
             }
         }));
@@ -97,10 +98,24 @@ async function refreshBadges(): Promise<void> {
 
         badgeData = await prepareBadgeData(data as JadgesResponse);
         const count = Object.values(badgeData).reduce((total, badges) => total + badges.length, 0);
-        console.info(`[JadgesBadges v4] Loaded ${count} badge(s) with local blob images.`);
+        console.warn(`[JadgesBadges v5] Loaded ${count} badge(s) with custom image components.`);
     } catch (error) {
-        console.error("[JadgesBadges v4] Failed to refresh badges:", error);
+        console.error("[JadgesBadges v5] Failed to refresh badges:", error);
     }
+}
+
+function JadgesBadgeIcon({ image, description }: ProfileBadge & BadgeUserArgs) {
+    return React.createElement("img", {
+        src: image,
+        alt: description || "Jadges Badge",
+        draggable: false,
+        style: {
+            width: "20px",
+            height: "20px",
+            display: "block",
+            objectFit: "contain"
+        }
+    });
 }
 
 function getBadges({ userId }: BadgeUserArgs): ProfileBadge[] {
@@ -118,15 +133,8 @@ function getBadges({ userId }: BadgeUserArgs): ProfileBadge[] {
                 key: id,
                 description,
                 image: badge.localImage || badge.badge,
-                position: BadgePosition.END,
-                props: {
-                    alt: description,
-                    style: {
-                        width: "20px",
-                        height: "20px",
-                        objectFit: "contain"
-                    }
-                }
+                component: JadgesBadgeIcon,
+                position: BadgePosition.END
             } satisfies ProfileBadge & { id: string; };
         });
 }
@@ -151,7 +159,7 @@ export default definePlugin({
     },
 
     async start() {
-        console.info("[JadgesBadges v4] Starting single-entry blob-image build.");
+        console.warn("[JadgesBadges v5] Starting custom-component build.");
         addProfileBadge(profileBadge);
         await refreshBadges();
 
