@@ -78,7 +78,7 @@ export default definePlugin({
                 },
                 {
                     match: /(?<="aria-label":(\i)\.description,.{0,200})children:/,
-                    replace: "children:$1.component?$self.renderBadgeComponent({...$1}) :"
+                    replace: "children:$1.component?$self.renderBadgeComponent({...$1}):$1.rawImage&&$1.image?$self.renderBadgeImage({...$1}):"
                 },
                 // conditionally override their onClick with badge.onClick if it exists
                 {
@@ -136,6 +136,25 @@ export default definePlugin({
         return <Component {...badge} />;
     }, { noop: true }),
 
+    renderBadgeImage: ErrorBoundary.wrap((badge: ProfileBadge & BadgeUserArgs) => {
+        const { style, ...props } = badge.props ?? {};
+
+        return (
+            <img
+                {...props}
+                alt=" "
+                aria-hidden={true}
+                draggable={false}
+                src={badge.image}
+                style={{
+                    width: "20px",
+                    height: "20px",
+                    objectFit: "contain",
+                    ...style
+                }}
+            />
+        );
+    }, { noop: true }),
 
     getDonorBadges(userId: string) {
         return DonorBadges[userId]?.map(badge => ({
@@ -166,7 +185,7 @@ export default definePlugin({
                                         }}
                                     >
                                         <Heart />
-                                        Vencord Donor
+                                        Vencord Contributor
                                     </Forms.FormTitle>
                                 </Flex>
                             </ModalHeader>
