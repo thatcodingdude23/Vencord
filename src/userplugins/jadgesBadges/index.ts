@@ -6,6 +6,7 @@
 import { addProfileBadge, BadgePosition, type BadgeUserArgs, type ProfileBadge, removeProfileBadge } from "@api/Badges";
 import { Settings } from "@api/Settings";
 import definePlugin, { OptionType } from "@utils/types";
+import { React, Tooltip } from "@webpack/common";
 
 interface JadgesBadge {
     name?: string;
@@ -68,7 +69,7 @@ async function prepareBadgeData(data: JadgesResponse): Promise<JadgesResponse> {
                     localImage: await fetchLocalImage(badge.badge)
                 };
             } catch (error) {
-                console.error(`[JadgesBadges v7] Failed to prepare ${badge.badge}:`, error);
+                console.error(`[JadgesBadges v8] Failed to prepare ${badge.badge}:`, error);
                 return badge;
             }
         }));
@@ -97,10 +98,44 @@ async function refreshBadges(): Promise<void> {
 
         badgeData = await prepareBadgeData(data as JadgesResponse);
         const count = Object.values(badgeData).reduce((total, badges) => total + badges.length, 0);
-        console.warn(`[JadgesBadges v7] Loaded ${count} native badge(s) with local images.`);
+        console.warn(`[JadgesBadges v8] Loaded ${count} badge(s) with images and Discord tooltips.`);
     } catch (error) {
-        console.error("[JadgesBadges v7] Failed to refresh badges:", error);
+        console.error("[JadgesBadges v8] Failed to refresh badges:", error);
     }
+}
+
+function JadgesBadgeIcon({ image, description }: ProfileBadge & BadgeUserArgs) {
+    const label = description || "Jadges Badge";
+
+    return React.createElement(Tooltip, {
+        text: label,
+        "aria-label": label,
+        children: tooltipProps => React.createElement(
+            "span",
+            {
+                ...tooltipProps,
+                style: {
+                    width: "20px",
+                    height: "20px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                }
+            },
+            React.createElement("img", {
+                src: image,
+                alt: " ",
+                "aria-hidden": true,
+                draggable: false,
+                style: {
+                    width: "20px",
+                    height: "20px",
+                    display: "block",
+                    objectFit: "contain"
+                }
+            })
+        )
+    });
 }
 
 function getBadges({ userId }: BadgeUserArgs): ProfileBadge[] {
@@ -118,16 +153,8 @@ function getBadges({ userId }: BadgeUserArgs): ProfileBadge[] {
                 key: id,
                 description,
                 image: badge.localImage || badge.badge,
-                position: BadgePosition.END,
-                props: {
-                    alt: " ",
-                    "aria-hidden": true,
-                    style: {
-                        width: "20px",
-                        height: "20px",
-                        objectFit: "contain"
-                    }
-                }
+                component: JadgesBadgeIcon,
+                position: BadgePosition.END
             } satisfies ProfileBadge & { id: string; };
         });
 }
@@ -152,7 +179,7 @@ export default definePlugin({
     },
 
     async start() {
-        console.warn("[JadgesBadges v7] Starting native-hover build.");
+        console.warn("[JadgesBadges v8] Starting image + Discord-tooltip build.");
         addProfileBadge(profileBadge);
         await refreshBadges();
 
