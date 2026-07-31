@@ -92,9 +92,11 @@ function getBadges({ userId }: BadgeUserArgs): ProfileBadge[] {
         .filter(badge => badge && typeof badge.badge === "string" && badge.badge.startsWith("https://"))
         .map((badge, index) => {
             const description = badge.tooltip || badge.name || "Jadges Badge";
+            const id = `jadges_${userId}_${index}`;
 
             return {
-                key: `jadges-${userId}-${index}-${description}`,
+                id,
+                key: id,
                 description,
                 image: badge.badge,
                 position: BadgePosition.END,
@@ -106,7 +108,7 @@ function getBadges({ userId }: BadgeUserArgs): ProfileBadge[] {
                         objectFit: "contain"
                     }
                 }
-            } satisfies ProfileBadge;
+            } satisfies ProfileBadge & { id: string; };
         });
 }
 
