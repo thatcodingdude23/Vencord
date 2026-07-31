@@ -6,7 +6,6 @@
 import { addProfileBadge, BadgePosition, type BadgeUserArgs, type ProfileBadge, removeProfileBadge } from "@api/Badges";
 import { Settings } from "@api/Settings";
 import definePlugin, { OptionType } from "@utils/types";
-import { React, Tooltip } from "@webpack/common";
 
 interface JadgesBadge {
     name?: string;
@@ -69,7 +68,7 @@ async function prepareBadgeData(data: JadgesResponse): Promise<JadgesResponse> {
                     localImage: await fetchLocalImage(badge.badge)
                 };
             } catch (error) {
-                console.error(`[JadgesBadges v6] Failed to prepare ${badge.badge}:`, error);
+                console.error(`[JadgesBadges v7] Failed to prepare ${badge.badge}:`, error);
                 return badge;
             }
         }));
@@ -98,33 +97,10 @@ async function refreshBadges(): Promise<void> {
 
         badgeData = await prepareBadgeData(data as JadgesResponse);
         const count = Object.values(badgeData).reduce((total, badges) => total + badges.length, 0);
-        console.warn(`[JadgesBadges v6] Loaded ${count} badge(s) with hover tooltips.`);
+        console.warn(`[JadgesBadges v7] Loaded ${count} native badge(s) with local images.`);
     } catch (error) {
-        console.error("[JadgesBadges v6] Failed to refresh badges:", error);
+        console.error("[JadgesBadges v7] Failed to refresh badges:", error);
     }
-}
-
-function JadgesBadgeIcon({ image, description }: ProfileBadge & BadgeUserArgs) {
-    const label = description || "Jadges Badge";
-
-    return React.createElement(
-        Tooltip,
-        { text: label },
-        (tooltipProps: Record<string, unknown>) => React.createElement("img", {
-            ...tooltipProps,
-            src: image,
-            alt: label,
-            "aria-label": label,
-            draggable: false,
-            style: {
-                width: "20px",
-                height: "20px",
-                display: "block",
-                objectFit: "contain",
-                cursor: "default"
-            }
-        })
-    );
 }
 
 function getBadges({ userId }: BadgeUserArgs): ProfileBadge[] {
@@ -142,8 +118,16 @@ function getBadges({ userId }: BadgeUserArgs): ProfileBadge[] {
                 key: id,
                 description,
                 image: badge.localImage || badge.badge,
-                component: JadgesBadgeIcon,
-                position: BadgePosition.END
+                position: BadgePosition.END,
+                props: {
+                    alt: " ",
+                    "aria-hidden": true,
+                    style: {
+                        width: "20px",
+                        height: "20px",
+                        objectFit: "contain"
+                    }
+                }
             } satisfies ProfileBadge & { id: string; };
         });
 }
@@ -168,7 +152,7 @@ export default definePlugin({
     },
 
     async start() {
-        console.warn("[JadgesBadges v6] Starting tooltip-enabled custom-component build.");
+        console.warn("[JadgesBadges v7] Starting native-hover build.");
         addProfileBadge(profileBadge);
         await refreshBadges();
 
